@@ -1,21 +1,44 @@
-name: GitHub Actions Demo
-run-name: ${{ github.actor }} is testing out GitHub Actions 🚀
+name: Auto Merge Check
+
 on:
   push:
     branches:
-    - "devA"
+    - devA
+
 jobs:
-  Explore-GitHub-Actions:
+  merge-check:
     runs-on: ubuntu-latest
     steps:
-    - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
-    - run: echo "🐧 This job is now running on a ${{ runner.os }} server hosted by GitHub!"
-    - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
-    - name: Check out repository code
+    - name: Checkout the current branch (devA)
       uses: actions/checkout@v4
-    - run: echo "💡 The ${{ github.repository }} repository has been cloned to the runner."
-    - run: echo "🖥️ The workflow is now ready to test your code on the runner."
-    - name: List files in the repository
+
+    - name: Set up Git config
       run: |
-        ls ${{ github.workspace }}
-    - run: echo "🍏 This job's status is ${{ job.status }}."
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Add remote and fetch main
+      run: |
+        git remote add origin2 https://github.com/${{ github.repository }}.git
+        git fetch origin2 main
+
+    - name: Try merging main into devA
+      id: merge
+      run: |
+        git checkout devA
+        if git merge origin2/main --no-edit; then
+          echo "Merge successful"
+          echo "MERGE_CONFLICT=false" >> $GITHUB_ENV
+        else
+          echo "Merge conflict detected!"
+          echo "MERGE_CONFLICT=true" >> $GITHUB_ENV
+        fi
+
+    - name: Handle merge result
+      run: |
+        if [ "${{ env.MERGE_CONFLICT }}" = "true" ]; then
+          echo "❌ Merge conflict detected. Please resolve manually."
+          exit 1
+        else
+          echo "✅ No conflicts. You can safely merge devA into main."
+        fi
